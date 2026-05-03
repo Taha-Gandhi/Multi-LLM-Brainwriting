@@ -44,6 +44,7 @@ all_ideas_text = "\n\n".join(
 print("\n========== STAGE 2: MULTI-ROUND DEBATE ==========")
 
 MAX_DEBATE_ROUNDS = 2
+MIN_DEBATE_ROUNDS = 2
 
 debate_rounds = []
 
@@ -78,6 +79,12 @@ for round_number in range(1, MAX_DEBATE_ROUNDS + 1):
                 "choose the best base idea, and explain what must be merged into the final solution."
             )
 
+        if {round_number} == 1:
+                convergence_rule = "For Round 1, you should usually end with READY_TO_CONVERGE: NO because this is only the opening argument."
+        else:
+                convergence_rule = "You may end with READY_TO_CONVERGE: YES only if you believe the team has a clear logical direction."
+            
+
         debate_prompt = f"""
             You are participating in Round {round_number} of an autonomous multi-agent debate.
             Round-specific instruction:
@@ -95,6 +102,9 @@ for round_number in range(1, MAX_DEBATE_ROUNDS + 1):
             Previous debate transcript:
             {previous_debate_text if previous_debate_text else "No previous debate yet. This is the first round."}
 
+            Convergence rule:
+            {convergence_rule}
+                
             Your task for this round:
             1. State your current position clearly.
             2. Defend your original idea if you still believe in it.
@@ -109,7 +119,9 @@ for round_number in range(1, MAX_DEBATE_ROUNDS + 1):
             or
             READY_TO_CONVERGE: NO
 
+
             Debate style rules:
+            - Do not say READY_TO_CONVERGE: YES in Round 1 unless the strongest base idea is extremely obvious.
             - Keep your response between 50 and 200 words.
             - Sound like a smart human teammate in a lively meeting.
             - Be fun and interesting to read.
@@ -149,7 +161,7 @@ for round_number in range(1, MAX_DEBATE_ROUNDS + 1):
         if "READY_TO_CONVERGE: YES" in response.upper()
     )
 
-    if yes_count >= 2:
+    if round_number >= MIN_DEBATE_ROUNDS and yes_count >= 2:
         print("\nConsensus signal reached. Moving to convergence stage.")
         break
 
