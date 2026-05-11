@@ -609,3 +609,14 @@ textarea:focus {
     width: 100%;
   }
 }
+
+.session-pill {
+  margin-top: 14px;
+  display: inline-block;
+  background: #0f172a;
+  color: white;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 800;
+}

@@ -106,7 +106,11 @@ function App() {
   const [votedIdeas, setVotedIdeas] = useState({});
   const [finalTitle, setFinalTitle] = useState("");
   const [finalDescription, setFinalDescription] = useState("");
-
+  const sessionId = new URLSearchParams(window.location.search).get("session") || "default-session";
+  const ideasCollectionRef = collection(db, "sessions", sessionId, "ideas");
+  const chatCollectionRef = collection(db, "sessions", sessionId, "generalChat");
+  const finalIdeaRef = doc(db, "sessions", sessionId, "sessionData", "finalIdea");
+  
   const sortedIdeas = useMemo(() => {
     return [...ideas].sort((a, b) => b.votes - a.votes);
   }, [ideas]);
@@ -122,7 +126,7 @@ function App() {
   const totalVotes = ideas.reduce((total, idea) => total + idea.votes, 0);
   useEffect(() => {
     const ideasQuery = query(
-      collection(db, "ideas"),
+      ideasCollectionRef,
       orderBy("createdAtTimestamp", "desc")
     );
   
@@ -152,7 +156,7 @@ function App() {
 
   useEffect(() => {
     const chatQuery = query(
-      collection(db, "generalChat"),
+      chatCollectionRef,
       orderBy("createdAtTimestamp", "asc")
     );
   
@@ -176,7 +180,6 @@ function App() {
 
   useEffect(() => {
     async function loadFinalIdea() {
-      const finalIdeaRef = doc(db, "sessionData", "finalIdea");
       const finalIdeaSnapshot = await getDoc(finalIdeaRef);
   
       if (finalIdeaSnapshot.exists()) {
@@ -204,7 +207,7 @@ function App() {
       comments: [],
     };
   
-    const docRef = await addDoc(collection(db, "ideas"), newIdea);
+    const docRef = await addDoc(ideasCollectionRef, newIdea);
   
     setActiveIdeaId(docRef.id);
     setIdeaTitle("");
@@ -230,7 +233,7 @@ function App() {
       },
     ];
   
-    const ideaRef = doc(db, "ideas", ideaId);
+    const ideaRef = doc(db, "sessions", sessionId, "ideas", ideaId);
   
     await updateDoc(ideaRef, {
       comments: updatedComments,
@@ -247,7 +250,7 @@ function App() {
   
     if (!chatDraft.trim()) return;
   
-    await addDoc(collection(db, "generalChat"), {
+    await addDoc( chatCollectionRef, {
       author: anonymousName(),
       text: chatDraft.trim(),
       time: timeNow(),
@@ -260,7 +263,7 @@ function App() {
   async function voteIdea(ideaId) {
     if (votedIdeas[ideaId]) return;
   
-    const ideaRef = doc(db, "ideas", ideaId);
+    const ideaRef = doc(db, "sessions", sessionId, "ideas", ideaId);
   
     await updateDoc(ideaRef, {
       votes: increment(1),
@@ -273,8 +276,6 @@ function App() {
   }
 
   async function saveFinalIdea() {
-    const finalIdeaRef = doc(db, "sessionData", "finalIdea");
-  
     await setDoc(finalIdeaRef, {
       title: finalTitle,
       description: finalDescription,
@@ -348,6 +349,9 @@ function App() {
             their threads, use the general chat to compare directions, and finally
             agree on one collaborative idea.
           </p>
+          <div className="session-pill">
+            Active session: {sessionId}
+          </div>
         </div>
       </section>
 
