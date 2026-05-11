@@ -22,6 +22,8 @@ import {
   updateDoc,
   doc,
   increment,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -172,6 +174,22 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    async function loadFinalIdea() {
+      const finalIdeaRef = doc(db, "sessionData", "finalIdea");
+      const finalIdeaSnapshot = await getDoc(finalIdeaRef);
+  
+      if (finalIdeaSnapshot.exists()) {
+        const data = finalIdeaSnapshot.data();
+  
+        setFinalTitle(data.title || "");
+        setFinalDescription(data.description || "");
+      }
+    }
+  
+    loadFinalIdea();
+  }, []);
+
   async function submitIdea(event) {
     event.preventDefault();
   
@@ -252,6 +270,19 @@ function App() {
       ...prev,
       [ideaId]: true,
     }));
+  }
+
+  async function saveFinalIdea() {
+    const finalIdeaRef = doc(db, "sessionData", "finalIdea");
+  
+    await setDoc(finalIdeaRef, {
+      title: finalTitle,
+      description: finalDescription,
+      updatedAt: timeNow(),
+      updatedAtTimestamp: serverTimestamp(),
+    });
+  
+    alert("Final collaborative idea saved!");
   }
   
   function exportSession() {
@@ -566,6 +597,10 @@ function App() {
               This will be exported for blind evaluation later.
             </p>
           </div>
+
+          <button className="save-final-button" onClick={saveFinalIdea}>
+            Save Final Idea
+          </button>
         </div>
 
         <div className="final-form">

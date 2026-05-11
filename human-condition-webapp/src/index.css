@@ -578,3 +578,34 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.final-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.save-final-button {
+  border: none;
+  border-radius: 18px;
+  padding: 14px 18px;
+  background: #0f172a;
+  color: white;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.save-final-button:hover {
+  background: #1e293b;
+}
+
+@media (max-width: 760px) {
+  .final-panel-header {
+    flex-direction: column;
+  }
+
+  .save-final-button {
+    width: 100%;
+  }
+}
