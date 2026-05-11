@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   MessageCircle,
   Send,
@@ -11,6 +11,20 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import "./index.css";
+
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  doc,
+  increment,
+} from "firebase/firestore";
+
+import { db } from "./firebase";
 
 const initialIdeas = [
   {
@@ -78,13 +92,13 @@ function anonymousName() {
 }
 
 function App() {
-  const [ideas, setIdeas] = useState(initialIdeas);
-  const [chat, setChat] = useState(initialChat);
+  const [ideas, setIdeas] = useState([]);
+  const [chat, setChat] = useState([]);
 
   const [ideaTitle, setIdeaTitle] = useState("");
   const [ideaBody, setIdeaBody] = useState("");
 
-  const [activeIdeaId, setActiveIdeaId] = useState(initialIdeas[0].id);
+  const [activeIdeaId, setActiveIdeaId] = useState("");
   const [commentDrafts, setCommentDrafts] = useState({});
   const [chatDraft, setChatDraft] = useState("");
   const [votedIdeas, setVotedIdeas] = useState({});
@@ -95,7 +109,8 @@ function App() {
     return [...ideas].sort((a, b) => b.votes - a.votes);
   }, [ideas]);
 
-  const activeIdea = ideas.find((idea) => idea.id === activeIdeaId) || ideas[0];
+  const activeIdea =
+    ideas.find((idea) => idea.id === activeIdeaId) || ideas[0] || null;
 
   const totalComments = ideas.reduce(
     (total, idea) => total + idea.comments.length,
@@ -103,94 +118,142 @@ function App() {
   );
 
   const totalVotes = ideas.reduce((total, idea) => total + idea.votes, 0);
+  useEffect(() => {
+    const ideasQuery = query(
+      collection(db, "ideas"),
+      orderBy("createdAtTimestamp", "desc")
+    );
+  
+    const unsubscribe = onSnapshot(ideasQuery, (snapshot) => {
+      const loadedIdeas = snapshot.docs.map((document) => {
+        const data = document.data();
+  
+        return {
+          id: document.id,
+          title: data.title,
+          body: data.body,
+          createdAt: data.createdAt || "",
+          votes: data.votes || 0,
+          comments: data.comments || [],
+        };
+      });
+  
+      setIdeas(loadedIdeas);
+  
+      if (loadedIdeas.length > 0 && !activeIdeaId) {
+        setActiveIdeaId(loadedIdeas[0].id);
+      }
+    });
+  
+    return () => unsubscribe();
+  }, [activeIdeaId]);
 
-  function submitIdea(event) {
+  useEffect(() => {
+    const chatQuery = query(
+      collection(db, "generalChat"),
+      orderBy("createdAtTimestamp", "asc")
+    );
+  
+    const unsubscribe = onSnapshot(chatQuery, (snapshot) => {
+      const loadedChat = snapshot.docs.map((document) => {
+        const data = document.data();
+  
+        return {
+          id: document.id,
+          author: data.author,
+          text: data.text,
+          time: data.time || "",
+        };
+      });
+  
+      setChat(loadedChat);
+    });
+  
+    return () => unsubscribe();
+  }, []);
+
+  async function submitIdea(event) {
     event.preventDefault();
-
+  
     if (!ideaTitle.trim() || !ideaBody.trim()) return;
-
+  
     const newIdea = {
-      id: `idea-${Date.now()}`,
       title: ideaTitle.trim(),
       body: ideaBody.trim(),
       createdAt: timeNow(),
+      createdAtTimestamp: serverTimestamp(),
       votes: 0,
       comments: [],
     };
-
-    setIdeas((prev) => [newIdea, ...prev]);
-    setActiveIdeaId(newIdea.id);
+  
+    const docRef = await addDoc(collection(db, "ideas"), newIdea);
+  
+    setActiveIdeaId(docRef.id);
     setIdeaTitle("");
     setIdeaBody("");
   }
 
-  function submitComment(ideaId) {
+  async function submitComment(ideaId) {
     const text = commentDrafts[ideaId]?.trim();
-
+  
     if (!text) return;
-
-    setIdeas((prevIdeas) =>
-      prevIdeas.map((idea) => {
-        if (idea.id !== ideaId) return idea;
-
-        return {
-          ...idea,
-          comments: [
-            ...idea.comments,
-            {
-              id: Date.now(),
-              author: anonymousName(),
-              text,
-              time: timeNow(),
-            },
-          ],
-        };
-      })
-    );
-
+  
+    const idea = ideas.find((item) => item.id === ideaId);
+  
+    if (!idea) return;
+  
+    const updatedComments = [
+      ...idea.comments,
+      {
+        id: Date.now(),
+        author: anonymousName(),
+        text,
+        time: timeNow(),
+      },
+    ];
+  
+    const ideaRef = doc(db, "ideas", ideaId);
+  
+    await updateDoc(ideaRef, {
+      comments: updatedComments,
+    });
+  
     setCommentDrafts((prev) => ({
       ...prev,
       [ideaId]: "",
     }));
   }
 
-  function submitChat(event) {
+  async function submitChat(event) {
     event.preventDefault();
-
+  
     if (!chatDraft.trim()) return;
-
-    setChat((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        author: anonymousName(),
-        text: chatDraft.trim(),
-        time: timeNow(),
-      },
-    ]);
-
+  
+    await addDoc(collection(db, "generalChat"), {
+      author: anonymousName(),
+      text: chatDraft.trim(),
+      time: timeNow(),
+      createdAtTimestamp: serverTimestamp(),
+    });
+  
     setChatDraft("");
   }
 
-  function voteIdea(ideaId) {
+  async function voteIdea(ideaId) {
     if (votedIdeas[ideaId]) return;
-
-    setIdeas((prevIdeas) =>
-      prevIdeas.map((idea) => {
-        if (idea.id !== ideaId) return idea;
-        return {
-          ...idea,
-          votes: idea.votes + 1,
-        };
-      })
-    );
-
+  
+    const ideaRef = doc(db, "ideas", ideaId);
+  
+    await updateDoc(ideaRef, {
+      votes: increment(1),
+    });
+  
     setVotedIdeas((prev) => ({
       ...prev,
       [ideaId]: true,
     }));
   }
-
+  
   function exportSession() {
     const sessionData = {
       condition: "Human Anonymous Brainwriting",
