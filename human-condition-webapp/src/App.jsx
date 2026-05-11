@@ -88,6 +88,8 @@ function App() {
   const [commentDrafts, setCommentDrafts] = useState({});
   const [chatDraft, setChatDraft] = useState("");
   const [votedIdeas, setVotedIdeas] = useState({});
+  const [finalTitle, setFinalTitle] = useState("");
+  const [finalDescription, setFinalDescription] = useState("");
 
   const sortedIdeas = useMemo(() => {
     return [...ideas].sort((a, b) => b.votes - a.votes);
@@ -192,9 +194,15 @@ function App() {
   function exportSession() {
     const sessionData = {
       condition: "Human Anonymous Brainwriting",
+      designChallenge:
+        "Design a solution that improves creative collaboration and idea selection in group brainwriting.",
       exportedAt: new Date().toISOString(),
       ideas,
       generalChat: chat,
+      finalCollaborativeIdea: {
+        title: finalTitle,
+        description: finalDescription,
+      },
     };
 
     const blob = new Blob([JSON.stringify(sessionData, null, 2)], {
@@ -232,6 +240,43 @@ function App() {
           <Download size={18} />
           Export JSON
         </button>
+      </section>
+
+      <section className="challenge-box">
+        <div>
+          <span>Design Challenge</span>
+          <h2>
+            Design a solution that improves creative collaboration and idea selection
+            in group brainwriting.
+          </h2>
+          <p>
+            First, submit your individual idea anonymously. Then discuss ideas in
+            their threads, use the general chat to compare directions, and finally
+            agree on one collaborative idea.
+          </p>
+        </div>
+      </section>
+
+      <section className="instructions-grid">
+        <div>
+          <strong>1. Submit</strong>
+          <p>Write one idea anonymously. Do not include your name.</p>
+        </div>
+
+        <div>
+          <strong>2. Discuss</strong>
+          <p>Comment under each idea thread with critique, questions, or improvements.</p>
+        </div>
+
+        <div>
+          <strong>3. Debate</strong>
+          <p>Use the general chat to compare ideas and negotiate a stronger direction.</p>
+        </div>
+
+        <div>
+          <strong>4. Converge</strong>
+          <p>Write the final collaborative idea in the final decision panel.</p>
+        </div>
       </section>
 
       <section className="stats-grid">
@@ -446,6 +491,34 @@ function App() {
             </form>
           </div>
         </aside>
+      </section>
+      
+      <section className="final-panel">
+        <div className="final-panel-header">
+          <div>
+            <span>Final Convergence</span>
+            <h2>Final Collaborative Idea</h2>
+            <p>
+              After the discussion, the group should agree on one final idea here.
+              This will be exported for blind evaluation later.
+            </p>
+          </div>
+        </div>
+
+        <div className="final-form">
+          <input
+            value={finalTitle}
+            onChange={(e) => setFinalTitle(e.target.value)}
+            placeholder="Final idea title"
+          />
+
+          <textarea
+            value={finalDescription}
+            onChange={(e) => setFinalDescription(e.target.value)}
+            placeholder="Describe the final collaborative idea clearly..."
+            rows="5"
+          />
+        </div>
       </section>
 
       <section className="prototype-note">
