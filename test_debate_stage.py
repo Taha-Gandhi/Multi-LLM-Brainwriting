@@ -156,14 +156,94 @@ for round_number in range(1, MAX_DEBATE_ROUNDS + 1):
         "responses": current_round_responses
     })
 
+    print(f"\nRound {round_number} completed.")
+
     yes_count = sum(
         1 for response in current_round_responses.values()
         if "READY_TO_CONVERGE: YES" in response.upper()
     )
 
+    print(f"Agents ready to converge: {yes_count}/{len(AGENTS)}")
+
     if round_number >= MIN_DEBATE_ROUNDS and yes_count >= 2:
         print("\nConsensus signal reached. Moving to convergence stage.")
         break
+
+print("\n========== STAGE 3: SCORING AND BASE IDEA SELECTION ==========")
+
+full_debate_text = ""
+
+for debate_round in debate_rounds:
+    full_debate_text += f"\n\nROUND {debate_round['round']}:\n"
+
+    for agent_name, response in debate_round["responses"].items():
+        full_debate_text += f"\n{agent_name}:\n{response}\n"
+
+scores = {}
+
+for agent_name, agent_info in AGENTS.items():
+    print(f"\n{agent_name} is scoring the ideas...")
+
+    scoring_prompt = f"""
+You are now in the convergence stage of an autonomous multi-agent brainwriting system.
+
+Design challenge:
+{challenge}
+
+Original generated ideas:
+{all_ideas_text}
+
+Full debate transcript:
+{full_debate_text}
+
+Your task:
+Score EACH original idea from 1 to 10 on the following criteria:
+1. Novelty
+2. Feasibility
+3. Human desirability
+4. Scalability
+5. Ethical safety
+
+Then choose ONE base idea that should be used for the final collaborative solution.
+
+Important:
+- Be honest. Do not automatically choose your own idea.
+- Use the debate arguments to update your judgment.
+- If another agent's idea is stronger, admit it.
+- Explain your reasoning clearly.
+- Keep the tone slightly lively, but more logical than dramatic.
+
+Return your answer in this exact format:
+
+Scores:
+[Agent Name / Idea Title]
+- Novelty:
+- Feasibility:
+- Human desirability:
+- Scalability:
+- Ethical safety:
+- Total:
+
+Chosen Base Idea:
+Reason:
+Suggested Elements to Merge:
+"""
+
+    scores[agent_name] = ask_model(
+        agent_name=agent_name,
+        model_id=agent_info["model"],
+        prompt=scoring_prompt,
+        system_prompt=agent_info["system_prompt"],
+        temperature=0.4
+    )
+
+print("\n\n========== SCORING RESULTS ==========")
+
+for agent_name, score_response in scores.items():
+    print("\n" + "=" * 60)
+    print(agent_name)
+    print("=" * 60)
+    print(score_response)
 
 print("\n\n========== FULL DEBATE TRANSCRIPT ==========")
 
@@ -205,4 +285,13 @@ with open("outputs/debate_transcript.txt", "w", encoding="utf-8") as file:
             file.write("-" * 60 + "\n")
             file.write(response + "\n\n")
 
+    file.write("\nSCORING AND BASE IDEA SELECTION\n")
+    file.write("=" * 70 + "\n\n")
+
+    for agent_name, score_response in scores.items():
+        file.write(agent_name + "\n")
+        file.write("-" * 60 + "\n")
+        file.write(score_response + "\n\n")
+
 print("\nDebate transcript saved to outputs/debate_transcript.txt")
+
