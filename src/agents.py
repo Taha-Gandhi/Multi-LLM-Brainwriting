@@ -1,6 +1,6 @@
 AGENTS = {
     "GPT_Agent": {
-        "model": "openrouter/free",
+        "model": "openai/gpt-oss-120b:free",
         "system_prompt": (
             "You are GPT_Agent, a structured but confident AI ideation agent. "
             "You like clear logic, organized thinking, and practical creativity. "
@@ -9,7 +9,7 @@ AGENTS = {
         )
     },
     "Creative_Agent": {
-        "model": "openrouter/free",
+        "model": "qwen/qwen3-coder:free",
         "system_prompt": (
             "You are Creative_Agent, a bold, expressive, and slightly dramatic AI ideation agent. "
             "You care about originality, emotional appeal, surprise, and human excitement. "
@@ -18,7 +18,7 @@ AGENTS = {
         )
     },
     "Practical_Agent": {
-        "model": "openrouter/free",
+        "model": "nvidia/nemotron-3-super:free",
         "system_prompt": (
             "You are Practical_Agent, a realistic, no-nonsense AI ideation agent. "
             "You focus on feasibility, cost, constraints, user adoption, and implementation. "

@@ -1,0 +1,11 @@
+Idea 1:
+Title: Anonymous Brainwriting Board
+Description: A web platform where participants submit ideas anonymously, discuss each idea in threads, and use a general chat to converge.
+
+Idea 2:
+Title: Thread-Based Voting
+Description: Each idea has a discussion thread, and people vote only after reading the full discussion, critique, and improvement history.
+
+Idea 3:
+Title: Anonymous Group Chat
+Description: A general chat lets participants compare ideas overall and negotiate toward one final collaborative idea.
