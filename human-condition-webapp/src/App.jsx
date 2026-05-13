@@ -24,6 +24,7 @@ import {
   increment,
   setDoc,
   getDoc,
+  runTransaction,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -93,6 +94,23 @@ function anonymousName() {
   return `Anon ${Math.floor(Math.random() * 9) + 1}`;
 }
 
+function getOrCreateParticipantId(sessionId) {
+  const storageKey = `participant_id_${sessionId}`;
+  const existingId = localStorage.getItem(storageKey);
+
+  if (existingId) {
+    return existingId;
+  }
+
+  const newId = `participant_${Date.now()}_${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+
+  localStorage.setItem(storageKey, newId);
+
+  return newId;
+}
+
 function App() {
   const [ideas, setIdeas] = useState([]);
   const [chat, setChat] = useState([]);
@@ -107,6 +125,7 @@ function App() {
   const [finalTitle, setFinalTitle] = useState("");
   const [finalDescription, setFinalDescription] = useState("");
   const sessionId = new URLSearchParams(window.location.search).get("session") || "default-session";
+  const participantId = getOrCreateParticipantId(sessionId);
   const ideasCollectionRef = collection(db, "sessions", sessionId, "ideas");
   const chatCollectionRef = collection(db, "sessions", sessionId, "generalChat");
   const finalIdeaRef = doc(db, "sessions", sessionId, "sessionData", "finalIdea");
@@ -141,6 +160,7 @@ function App() {
           createdAt: data.createdAt || "",
           votes: data.votes || 0,
           comments: data.comments || [],
+          votedBy: data.votedBy || {},
         };
       });
   
@@ -261,18 +281,41 @@ function App() {
   }
 
   async function voteIdea(ideaId) {
-    if (votedIdeas[ideaId]) return;
-  
     const ideaRef = doc(db, "sessions", sessionId, "ideas", ideaId);
   
-    await updateDoc(ideaRef, {
-      votes: increment(1),
-    });
+    try {
+      await runTransaction(db, async (transaction) => {
+        const ideaSnapshot = await transaction.get(ideaRef);
   
-    setVotedIdeas((prev) => ({
-      ...prev,
-      [ideaId]: true,
-    }));
+        if (!ideaSnapshot.exists()) {
+          throw new Error("Idea does not exist.");
+        }
+  
+        const ideaData = ideaSnapshot.data();
+        const votedBy = ideaData.votedBy || {};
+  
+        if (votedBy[participantId]) {
+          throw new Error("ALREADY_VOTED");
+        }
+  
+        transaction.update(ideaRef, {
+          votes: increment(1),
+          [`votedBy.${participantId}`]: true,
+        });
+      });
+  
+      setVotedIdeas((prev) => ({
+        ...prev,
+        [ideaId]: true,
+      }));
+    } catch (error) {
+      if (error.message === "ALREADY_VOTED") {
+        alert("You have already voted for this idea.");
+      } else {
+        console.error("Vote failed:", error);
+        alert("Vote could not be saved. Please try again.");
+      }
+    }
   }
 
   async function saveFinalIdea() {
@@ -486,14 +529,14 @@ function App() {
 
                 <button
                   className={
-                    votedIdeas[activeIdea.id]
+                    activeIdea.votedBy?.[participantId] || votedIdeas[activeIdea.id]
                       ? "vote-button voted"
                       : "vote-button"
                   }
                   onClick={() => voteIdea(activeIdea.id)}
-                  disabled={votedIdeas[activeIdea.id]}
+                  disabled={activeIdea.votedBy?.[participantId] || votedIdeas[activeIdea.id]}
                 >
-                  {votedIdeas[activeIdea.id] ? (
+                  {activeIdea.votedBy?.[participantId] || votedIdeas[activeIdea.id] ? (
                     <>
                       <CheckCircle2 size={18} />
                       Voted
