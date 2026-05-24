@@ -648,6 +648,32 @@ const conditionLabel = isAnonymousCondition
         </div>
       </section>
 
+      <section className={isAnonymousCondition ? "mode-banner anonymous" : "mode-banner open"}>
+        <div>
+          <span>
+            {isAnonymousCondition ? "Anonymous Mode" : "Open Mode"}
+          </span>
+
+          <h2>
+            {isAnonymousCondition
+              ? "Your identity is hidden from other participants."
+              : "Your name is visible to other participants."}
+          </h2>
+
+          <p>
+            {isAnonymousCondition
+              ? "Your name and student ID are collected only for researcher tracking. Other participants will see your activity as anonymous."
+              : "Your ideas, comments, chat messages, and votes will appear with your name so the group can discuss openly."}
+          </p>
+        </div>
+
+        <div className="mode-user-pill">
+          {isAnonymousCondition
+            ? "Displayed as: Anonymous Participant"
+            : `Displayed as: ${participantName || "Named Participant"}`}
+        </div>
+      </section>
+
       <section className="instructions-grid">
         <div>
           <strong>1. Submit</strong>

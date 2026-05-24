@@ -692,3 +692,74 @@ textarea:focus {
   font-size: 13px !important;
   font-weight: 700;
 }
+
+.mode-banner {
+  margin-top: 18px;
+  border-radius: 28px;
+  padding: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+}
+
+.mode-banner.anonymous {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+}
+
+.mode-banner.open {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.mode-banner span {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.mode-banner.anonymous span {
+  color: #047857;
+}
+
+.mode-banner.open span {
+  color: #1d4ed8;
+}
+
+.mode-banner h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.mode-banner p {
+  margin: 8px 0 0;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.mode-user-pill {
+  background: #0f172a;
+  color: white;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .mode-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mode-user-pill {
+    white-space: normal;
+  }
+}
