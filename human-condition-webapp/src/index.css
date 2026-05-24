@@ -763,3 +763,77 @@ textarea:focus {
     white-space: normal;
   }
 }
+
+.study-flow {
+  margin-top: 18px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 22px;
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.04);
+}
+
+.study-flow-header span {
+  display: inline-block;
+  color: #047857;
+  font-weight: 900;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.study-flow-header h2 {
+  margin: 0 0 18px;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.flow-steps {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.flow-step {
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.flow-step strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: white;
+  margin-bottom: 12px;
+}
+
+.flow-step h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.flow-step p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+@media (max-width: 1000px) {
+  .flow-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .flow-steps {
+    grid-template-columns: 1fr;
+  }
+}

@@ -674,6 +674,55 @@ const conditionLabel = isAnonymousCondition
         </div>
       </section>
 
+      <section className="study-flow">
+        <div className="study-flow-header">
+          <span>Study Flow</span>
+          <h2>Follow these steps during the session</h2>
+        </div>
+
+        <div className="flow-steps">
+          <div className="flow-step">
+            <strong>1</strong>
+            <div>
+              <h3>Submit</h3>
+              <p>Add your first idea individually.</p>
+            </div>
+          </div>
+
+          <div className="flow-step">
+            <strong>2</strong>
+            <div>
+              <h3>Thread</h3>
+              <p>Comment under specific ideas.</p>
+            </div>
+          </div>
+
+          <div className="flow-step">
+            <strong>3</strong>
+            <div>
+              <h3>Discuss</h3>
+              <p>Use the group chat to compare ideas.</p>
+            </div>
+          </div>
+
+          <div className="flow-step">
+            <strong>4</strong>
+            <div>
+              <h3>Vote</h3>
+              <p>Support the strongest idea.</p>
+            </div>
+          </div>
+
+          <div className="flow-step">
+            <strong>5</strong>
+            <div>
+              <h3>Converge</h3>
+              <p>Write the final collaborative idea.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="instructions-grid">
         <div>
           <strong>1. Submit</strong>
