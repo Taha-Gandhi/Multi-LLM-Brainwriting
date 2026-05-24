@@ -124,12 +124,46 @@ function App() {
   const [votedIdeas, setVotedIdeas] = useState({});
   const [finalTitle, setFinalTitle] = useState("");
   const [finalDescription, setFinalDescription] = useState("");
+
+  const [participantName, setParticipantName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [accessStatus, setAccessStatus] = useState("checking");
+  const [accessError, setAccessError] = useState("");
   const sessionId = new URLSearchParams(window.location.search).get("session") || "default-session";
   const participantId = getOrCreateParticipantId(sessionId);
   const ideasCollectionRef = collection(db, "sessions", sessionId, "ideas");
   const chatCollectionRef = collection(db, "sessions", sessionId, "generalChat");
   const finalIdeaRef = doc(db, "sessions", sessionId, "sessionData", "finalIdea");
   
+  const condition =
+    new URLSearchParams(window.location.search).get("condition") || "1a";
+
+  const participantRef = doc(
+    db,
+    "sessions",
+    sessionId,
+    "participants",
+    participantId
+  );
+
+  const sessionAccessCodes = {
+    pilot: "PILOT1A",
+    "test-vote": "TEST1A",
+    "group-1a-a": "GROUPA1A",
+    "group-1a-b": "GROUPB1A",
+    "group-1a-c": "GROUPC1A",
+    "group-1b-a": "GROUPA1B",
+    "group-1b-b": "GROUPB1B",
+    "group-1b-c": "GROUPC1B",
+    "default-session": "BRAINWRITE1A",
+  };
+
+const requiredAccessCode = sessionAccessCodes[sessionId];
+const isAnonymousCondition = condition === "1a";
+const conditionLabel = isAnonymousCondition
+  ? "1a Anonymous Human Convergence"
+  : "1b Open Human Convergence";
   const sortedIdeas = useMemo(() => {
     return [...ideas].sort((a, b) => b.votes - a.votes);
   }, [ideas]);
@@ -143,6 +177,29 @@ function App() {
   );
 
   const totalVotes = ideas.reduce((total, idea) => total + idea.votes, 0);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(participantRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setAccessStatus("not_requested");
+        return;
+      }
+  
+      const data = snapshot.data();
+  
+      if (data.approved === true) {
+        setAccessStatus("approved");
+        setParticipantName(data.name || "");
+        setStudentId(data.studentId || "");
+      } else {
+        setAccessStatus("pending");
+        setParticipantName(data.name || "");
+        setStudentId(data.studentId || "");
+      }
+    });
+  
+    return () => unsubscribe();
+  }, [participantId, sessionId]);
+  
   useEffect(() => {
     const ideasQuery = query(
       ideasCollectionRef,
@@ -161,6 +218,11 @@ function App() {
           votes: data.votes || 0,
           comments: data.comments || [],
           votedBy: data.votedBy || {},
+          authorParticipantId: data.authorParticipantId || "",
+          authorName: data.authorName || "",
+          authorStudentId: data.authorStudentId || "",
+          displayAuthor: data.displayAuthor || "Anonymous Participant",
+          condition: data.condition || condition,
         };
       });
   
@@ -186,9 +248,13 @@ function App() {
   
         return {
           id: document.id,
-          author: data.author,
+          author: data.author || "Anonymous Participant",
+          authorParticipantId: data.authorParticipantId || "",
+          authorName: data.authorName || "",
+          authorStudentId: data.authorStudentId || "",
           text: data.text,
           time: data.time || "",
+          condition: data.condition || condition,
         };
       });
   
@@ -213,6 +279,55 @@ function App() {
     loadFinalIdea();
   }, []);
 
+  function getDisplayAuthor() {
+    if (isAnonymousCondition) {
+      return anonymousName();
+    }
+  
+    return participantName || "Named Participant";
+  }
+
+  async function handleAccessSubmit(event) {
+    event.preventDefault();
+  
+    const cleanedName = participantName.trim();
+    const cleanedStudentId = studentId.trim();
+    const cleanedCode = accessCode.trim().toUpperCase();
+  
+    if (!cleanedName || !cleanedStudentId || !cleanedCode) {
+      setAccessError("Please fill in your name, student ID, and password.");
+      return;
+    }
+  
+    if (!requiredAccessCode) {
+      setAccessError("This session is not configured. Please check the session link.");
+      return;
+    }
+  
+    if (cleanedCode !== requiredAccessCode) {
+      setAccessError("Invalid password for this session.");
+      return;
+    }
+  
+    await setDoc(
+      participantRef,
+      {
+        participantId,
+        name: cleanedName,
+        studentId: cleanedStudentId,
+        sessionId,
+        condition,
+        approved: false,
+        requestedAt: timeNow(),
+        requestedAtTimestamp: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  
+    setAccessError("");
+    setAccessStatus("pending");
+  }
+
   async function submitIdea(event) {
     event.preventDefault();
   
@@ -225,6 +340,11 @@ function App() {
       createdAtTimestamp: serverTimestamp(),
       votes: 0,
       comments: [],
+      authorParticipantId: participantId,
+      authorName: participantName,
+      authorStudentId: studentId,
+      displayAuthor: getDisplayAuthor(),
+      condition,
     };
   
     const docRef = await addDoc(ideasCollectionRef, newIdea);
@@ -247,9 +367,13 @@ function App() {
       ...idea.comments,
       {
         id: Date.now(),
-        author: anonymousName(),
+        author: getDisplayAuthor(),
+        authorParticipantId: participantId,
+        authorName: participantName,
+        authorStudentId: studentId,
         text,
         time: timeNow(),
+        condition,
       },
     ];
   
@@ -270,11 +394,15 @@ function App() {
   
     if (!chatDraft.trim()) return;
   
-    await addDoc( chatCollectionRef, {
-      author: anonymousName(),
+    await addDoc(chatCollectionRef, {
+      author: getDisplayAuthor(),
+      authorParticipantId: participantId,
+      authorName: participantName,
+      authorStudentId: studentId,
       text: chatDraft.trim(),
       time: timeNow(),
       createdAtTimestamp: serverTimestamp(),
+      condition,
     });
   
     setChatDraft("");
@@ -357,21 +485,135 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
+  if (accessStatus === "checking") {
+    return (
+      <main className="access-page">
+        <section className="access-card">
+          <div className="badge">
+            <EyeOff size={16} />
+            Checking Access
+          </div>
+          <h1>Please wait</h1>
+          <p>Checking whether you have access to this study session...</p>
+        </section>
+      </main>
+    );
+  }
+  
+  if (accessStatus === "not_requested") {
+    return (
+      <main className="access-page">
+        <section className="access-card">
+          <div className="badge">
+            <EyeOff size={16} />
+            Restricted Study Access
+          </div>
+  
+          <h1>Request Access</h1>
+  
+          <p>
+            This study room is only for invited participants. Please enter your
+            details and the password provided by the researcher.
+          </p>
+  
+          <div className="access-session">
+            Session: <strong>{sessionId}</strong>
+            <br />
+            Condition: <strong>{condition}</strong>
+          </div>
+  
+          <form onSubmit={handleAccessSubmit} className="access-form">
+            <input
+              value={participantName}
+              onChange={(e) => setParticipantName(e.target.value)}
+              placeholder="Full name"
+            />
+  
+            <input
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+              placeholder="Student ID"
+            />
+  
+            <input
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              placeholder="Password"
+              type="password"
+            />
+  
+            <button type="submit" className="primary-button">
+              Request Access
+            </button>
+          </form>
+  
+          {accessError && <div className="access-error">{accessError}</div>}
+  
+          <p className="access-note">
+            Your name and student ID are collected only for researcher tracking.
+            Inside the anonymous condition, your activity will still appear
+            anonymous to other participants.
+          </p>
+        </section>
+      </main>
+    );
+  }
+  
+  if (accessStatus === "pending") {
+    return (
+      <main className="access-page">
+        <section className="access-card">
+          <div className="badge">
+            <EyeOff size={16} />
+            Access Pending
+          </div>
+  
+          <h1>Waiting for Approval</h1>
+  
+          <p>
+            Your access request has been submitted. Please wait for the researcher
+            to approve your access in Firebase, then refresh this page.
+          </p>
+  
+          <div className="access-session">
+            Session: <strong>{sessionId}</strong>
+            <br />
+            Name: <strong>{participantName}</strong>
+            <br />
+            Student ID: <strong>{studentId}</strong>
+          </div>
+  
+          <button
+            className="dark-button"
+            onClick={() => window.location.reload()}
+          >
+            Refresh Access
+          </button>
+        </section>
+      </main>
+    );
+  }
+  
   return (
     <main className="app">
       <section className="hero">
         <div>
-          <div className="badge">
-            <EyeOff size={16} />
-            Anonymous Human Condition
-          </div>
+        <div className="badge">
+          <EyeOff size={16} />
+          {conditionLabel}
+        </div>
 
-          <h1>Anonymous Brainwriting Room</h1>
+        <h1>
+          {isAnonymousCondition
+            ? "Anonymous Brainwriting Room"
+            : "Open Brainwriting Room"}
+        </h1>
 
-          <p>
-            Submit ideas anonymously, discuss each idea in its own thread, and
-            use the general group chat to converge on one final direction.
-          </p>
+        <p>
+          {isAnonymousCondition
+            ? "Submit ideas anonymously, discuss each idea in its own thread, and use the general group chat to converge on one final direction."
+            : "Submit ideas with your name visible, discuss each idea in its own thread, and use the general group chat to converge on one final direction."}
+        </p>
         </div>
 
         <button className="dark-button" onClick={exportSession}>
@@ -387,11 +629,19 @@ function App() {
             Design a solution that improves creative collaboration and idea selection
             in group brainwriting.
           </h2>
-          <p>
-            First, submit your individual idea anonymously. Then discuss ideas in
-            their threads, use the general chat to compare directions, and finally
-            agree on one collaborative idea.
-          </p>
+          {isAnonymousCondition ? (
+            <p>
+              First, submit your individual idea anonymously. Then discuss ideas in
+              their threads, use the general chat to compare directions, and finally
+              agree on one collaborative idea.
+            </p>
+          ) : (
+            <p>
+              First, submit your individual idea with your name visible. Then discuss
+              ideas in their threads, use the general chat to compare directions, and
+              finally agree on one collaborative idea.
+            </p>
+          )}
           <div className="session-pill">
             Active session: {sessionId}
           </div>
@@ -460,8 +710,14 @@ function App() {
             <div className="panel-heading">
               <Plus size={20} />
               <div>
-                <h2>Submit anonymous idea</h2>
-                <p>No names are shown to participants.</p>
+                <h2>
+                  {isAnonymousCondition ? "Submit anonymous idea" : "Submit named idea"}
+                </h2>
+                <p>
+                  {isAnonymousCondition
+                    ? "No names are shown to participants."
+                    : "Your name will be shown with your idea."}
+                </p>
               </div>
             </div>
 
@@ -501,6 +757,11 @@ function App() {
                     <div>
                       <span>Idea {index + 1}</span>
                       <h3>{idea.title}</h3>
+                      <p className="idea-author">
+                        {isAnonymousCondition
+                          ? "Submitted anonymously"
+                          : `Submitted by ${idea.authorName || idea.displayAuthor}`}
+                      </p>
                     </div>
 
                     <strong>{idea.votes} votes</strong>
@@ -518,9 +779,13 @@ function App() {
             <div className="panel large-panel">
               <div className="idea-detail-top">
                 <div>
-                  <span className="time-label">
-                    Submitted anonymously at {activeIdea.createdAt}
-                  </span>
+                <span className="time-label">
+                  {isAnonymousCondition
+                    ? `Submitted anonymously at ${activeIdea.createdAt}`
+                    : `Submitted by ${
+                        activeIdea.authorName || activeIdea.displayAuthor
+                      } at ${activeIdea.createdAt}`}
+                </span>
 
                   <h2>{activeIdea.title}</h2>
 
@@ -667,9 +932,9 @@ function App() {
       </section>
 
       <section className="prototype-note">
-        <strong>Prototype note:</strong> This quick version stores data in the
-        browser only. For the real study, connect it to Firebase, Supabase, or a
-        small backend so multiple participants can join live and data persists.
+      <strong>Study note:</strong> This session is connected to Firebase and stores
+        ideas, comments, votes, chat messages, final decisions, and participant access
+        records for the selected session.
       </section>
     </main>
   );
