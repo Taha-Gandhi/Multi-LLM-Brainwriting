@@ -559,7 +559,9 @@ const conditionLabel = isAnonymousCondition
   
   function exportSession() {
     const sessionData = {
-      condition: "Human Anonymous Brainwriting",
+      condition: conditionLabel,
+      sessionId,
+      conditionCode: condition,
       designChallenge:
         "Design a solution that improves creative collaboration and idea selection in group brainwriting.",
       exportedAt: new Date().toISOString(),
@@ -875,7 +877,11 @@ const conditionLabel = isAnonymousCondition
       <section className="instructions-grid">
         <div>
           <strong>1. Submit</strong>
-          <p>Write one idea anonymously. Do not include your name.</p>
+          <p>
+            {isAnonymousCondition
+              ? "Write one idea anonymously. Do not include your name."
+              : "Write one idea with your name visible."}
+          </p>
         </div>
 
         <div>
@@ -899,7 +905,7 @@ const conditionLabel = isAnonymousCondition
           <Lightbulb />
           <div>
             <strong>{ideas.length}</strong>
-            <span>Anonymous ideas</span>
+            <span>{isAnonymousCondition ? "Anonymous ideas" : "Named ideas"}</span>
           </div>
         </div>
 
@@ -1099,7 +1105,11 @@ const conditionLabel = isAnonymousCondition
                       [activeIdea.id]: e.target.value,
                     }))
                   }
-                  placeholder="Write an anonymous critique, question, or improvement..."
+                  placeholder={
+                    isAnonymousCondition
+                      ? "Write an anonymous critique, question, or improvement..."
+                      : "Write a critique, question, or improvement..."
+                  }
                 />
 
                 <button onClick={() => submitComment(activeIdea.id)}>
@@ -1115,7 +1125,9 @@ const conditionLabel = isAnonymousCondition
             <div className="panel-heading">
               <Users size={20} />
               <div>
-                <h2>General anonymous chat</h2>
+                <h2>
+                  {isAnonymousCondition ? "General anonymous chat" : "General group chat"}
+                </h2>
                 <p>Discuss patterns, compare ideas, and converge.</p>
               </div>
             </div>
