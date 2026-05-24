@@ -25,6 +25,8 @@ import {
   setDoc,
   getDoc,
   runTransaction,
+  deleteDoc,
+  deleteField,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -122,6 +124,7 @@ function App() {
   const [commentDrafts, setCommentDrafts] = useState({});
   const [chatDraft, setChatDraft] = useState("");
   const [votedIdeas, setVotedIdeas] = useState({});
+  const [participantVote, setParticipantVote] = useState("");
   const [finalTitle, setFinalTitle] = useState("");
   const [finalDescription, setFinalDescription] = useState("");
 
@@ -164,12 +167,21 @@ const isAnonymousCondition = condition === "1a";
 const conditionLabel = isAnonymousCondition
   ? "1a Anonymous Human Convergence"
   : "1b Open Human Convergence";
+
+  const hasSubmittedIdea = ideas.some(
+    (idea) => idea.authorParticipantId === participantId
+  );
+
   const sortedIdeas = useMemo(() => {
     return [...ideas].sort((a, b) => b.votes - a.votes);
   }, [ideas]);
 
   const activeIdea =
     ideas.find((idea) => idea.id === activeIdeaId) || ideas[0] || null;
+
+  const activeIdeaIsOwn = activeIdea?.authorParticipantId === participantId;
+  const activeIdeaIsVoted = participantVote === activeIdea?.id;
+  const hasVotedAnotherIdea = participantVote && participantVote !== activeIdea?.id;
 
   const totalComments = ideas.reduce(
     (total, idea) => total + idea.comments.length,
@@ -190,10 +202,12 @@ const conditionLabel = isAnonymousCondition
         setAccessStatus("approved");
         setParticipantName(data.name || "");
         setStudentId(data.studentId || "");
+        setParticipantVote(data.votedIdeaId || "");
       } else {
         setAccessStatus("pending");
         setParticipantName(data.name || "");
         setStudentId(data.studentId || "");
+        setParticipantVote(data.votedIdeaId || "");
       }
     });
   
@@ -328,8 +342,41 @@ const conditionLabel = isAnonymousCondition
     setAccessStatus("pending");
   }
 
+  async function deleteOwnIdea(ideaId) {
+    const idea = ideas.find((item) => item.id === ideaId);
+  
+    if (!idea) return;
+  
+    if (idea.authorParticipantId !== participantId) {
+      alert("You can only delete your own idea.");
+      return;
+    }
+  
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete your idea? You will be able to submit a new one after deleting it."
+    );
+  
+    if (!confirmDelete) return;
+  
+    const ideaRef = doc(db, "sessions", sessionId, "ideas", ideaId);
+  
+    await deleteDoc(ideaRef);
+  
+    if (activeIdeaId === ideaId) {
+      setActiveIdeaId("");
+    }
+  
+    setIdeaTitle("");
+    setIdeaBody("");
+  }
+
   async function submitIdea(event) {
     event.preventDefault();
+
+    if (hasSubmittedIdea) {
+      alert("You have already submitted your one idea for this session.");
+      return;
+    }
   
     if (!ideaTitle.trim() || !ideaBody.trim()) return;
   
@@ -409,40 +456,93 @@ const conditionLabel = isAnonymousCondition
   }
 
   async function voteIdea(ideaId) {
-    const ideaRef = doc(db, "sessions", sessionId, "ideas", ideaId);
+    const selectedIdea = ideas.find((idea) => idea.id === ideaId);
+  
+    if (!selectedIdea) return;
+  
+    if (selectedIdea.authorParticipantId === participantId) {
+      alert("You cannot vote for your own idea.");
+      return;
+    }
+  
+    const selectedIdeaRef = doc(db, "sessions", sessionId, "ideas", ideaId);
   
     try {
       await runTransaction(db, async (transaction) => {
-        const ideaSnapshot = await transaction.get(ideaRef);
+        const participantSnapshot = await transaction.get(participantRef);
+        const selectedIdeaSnapshot = await transaction.get(selectedIdeaRef);
   
-        if (!ideaSnapshot.exists()) {
+        if (!selectedIdeaSnapshot.exists()) {
           throw new Error("Idea does not exist.");
         }
   
-        const ideaData = ideaSnapshot.data();
-        const votedBy = ideaData.votedBy || {};
+        const participantData = participantSnapshot.exists()
+          ? participantSnapshot.data()
+          : {};
   
-        if (votedBy[participantId]) {
-          throw new Error("ALREADY_VOTED");
+        const previousVoteId = participantData.votedIdeaId || "";
+  
+        if (previousVoteId === ideaId) {
+          transaction.update(selectedIdeaRef, {
+            votes: increment(-1),
+            [`votedBy.${participantId}`]: deleteField(),
+          });
+  
+          transaction.set(
+            participantRef,
+            {
+              votedIdeaId: "",
+              votedAt: "",
+            },
+            { merge: true }
+          );
+  
+          return;
         }
   
-        transaction.update(ideaRef, {
+        if (previousVoteId) {
+          const previousIdeaRef = doc(
+            db,
+            "sessions",
+            sessionId,
+            "ideas",
+            previousVoteId
+          );
+  
+          const previousIdeaSnapshot = await transaction.get(previousIdeaRef);
+  
+          if (previousIdeaSnapshot.exists()) {
+            transaction.update(previousIdeaRef, {
+              votes: increment(-1),
+              [`votedBy.${participantId}`]: deleteField(),
+            });
+          }
+        }
+  
+        transaction.update(selectedIdeaRef, {
           votes: increment(1),
           [`votedBy.${participantId}`]: true,
         });
+  
+        transaction.set(
+          participantRef,
+          {
+            votedIdeaId: ideaId,
+            votedAt: timeNow(),
+            votedAtTimestamp: serverTimestamp(),
+          },
+          { merge: true }
+        );
       });
   
-      setVotedIdeas((prev) => ({
-        ...prev,
-        [ideaId]: true,
-      }));
+      setParticipantVote((previousVoteId) =>
+        previousVoteId === ideaId ? "" : ideaId
+      );
+  
+      setVotedIdeas({});
     } catch (error) {
-      if (error.message === "ALREADY_VOTED") {
-        alert("You have already voted for this idea.");
-      } else {
-        console.error("Vote failed:", error);
-        alert("Vote could not be saved. Please try again.");
-      }
+      console.error("Vote failed:", error);
+      alert("Vote could not be saved. Please try again.");
     }
   }
 
@@ -685,7 +785,7 @@ const conditionLabel = isAnonymousCondition
             <strong>1</strong>
             <div>
               <h3>Submit</h3>
-              <p>Add your first idea individually.</p>
+              <p>Add exactly one idea individually.</p>
             </div>
           </div>
 
@@ -709,7 +809,7 @@ const conditionLabel = isAnonymousCondition
             <strong>4</strong>
             <div>
               <h3>Vote</h3>
-              <p>Support the strongest idea.</p>
+              <p>Vote for one idea, but not your own.</p>
             </div>
           </div>
 
@@ -720,6 +820,55 @@ const conditionLabel = isAnonymousCondition
               <p>Write the final collaborative idea.</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="rules-panel">
+        <div className="rules-header">
+          <span>Before You Start</span>
+          <h2>Quick rules for this session</h2>
+          <p>
+            Please follow these simple rules so the discussion stays clear,
+            respectful, and useful for the study.
+          </p>
+        </div>
+
+        <div className="rules-list">
+          <div className="rule-item">
+            <strong>1</strong>
+            <p>Submit exactly one idea before discussing or voting. You may delete your own
+              idea and submit a new one if needed. Please do not use AI; keep it creative
+              and original.</p>
+          </div>
+
+          <div className="rule-item">
+            <strong>2</strong>
+            <p>
+              Vote for only one idea at a time. You may remove or change your vote, but you
+              cannot vote for your own idea.
+            </p>
+          </div>
+
+          <div className="rule-item">
+            <strong>3</strong>
+            <p>Comment constructively. You can suggest, improve, question, or combine ideas.</p>
+          </div>
+
+          <div className="rule-item">
+            <strong>4</strong>
+            <p>Use the group chat to compare ideas and agree on one final direction.</p>
+          </div>
+
+          <div className="rule-item">
+            <strong>5</strong>
+            <p>Keep the final collaborative idea short, clear, and understandable.</p>
+          </div>
+        </div>
+
+        <div className="rules-note">
+          {isAnonymousCondition
+            ? "Anonymous condition: your name is hidden from other participants during ideas, comments, and chat."
+            : "Open condition: your name will be visible with your ideas, comments, and chat messages."}
         </div>
       </section>
 
@@ -810,9 +959,20 @@ const conditionLabel = isAnonymousCondition
                 rows="5"
               />
 
-              <button className="primary-button" type="submit">
-                Add idea anonymously
+              <button className="primary-button" type="submit" disabled={hasSubmittedIdea}>
+                {hasSubmittedIdea
+                  ? "Idea Already Submitted"
+                  : isAnonymousCondition
+                    ? "Add idea anonymously"
+                    : "Add named idea"}
               </button>
+
+              {hasSubmittedIdea && (
+                <p className="form-note">
+                  You have already submitted your one idea. You can now read, comment, vote,
+                  and help finalize the group idea.
+                </p>
+              )}
             </form>
           </div>
 
@@ -867,27 +1027,41 @@ const conditionLabel = isAnonymousCondition
                   <p>{activeIdea.body}</p>
                 </div>
 
-                <button
-                  className={
-                    activeIdea.votedBy?.[participantId] || votedIdeas[activeIdea.id]
-                      ? "vote-button voted"
-                      : "vote-button"
-                  }
-                  onClick={() => voteIdea(activeIdea.id)}
-                  disabled={activeIdea.votedBy?.[participantId] || votedIdeas[activeIdea.id]}
-                >
-                  {activeIdea.votedBy?.[participantId] || votedIdeas[activeIdea.id] ? (
-                    <>
-                      <CheckCircle2 size={18} />
-                      Voted
-                    </>
-                  ) : (
-                    <>
-                      <Vote size={18} />
-                      Vote
-                    </>
+                <div className="idea-actions">
+                  {activeIdeaIsOwn && (
+                    <button
+                      className="delete-button"
+                      onClick={() => deleteOwnIdea(activeIdea.id)}
+                    >
+                      Delete My Idea
+                    </button>
                   )}
-                </button>
+
+                  <button
+                    className={activeIdeaIsVoted ? "vote-button voted" : "vote-button"}
+                    onClick={() => voteIdea(activeIdea.id)}
+                    disabled={activeIdeaIsOwn}
+                  >
+                    {activeIdeaIsOwn ? (
+                      "Cannot Vote Own Idea"
+                    ) : activeIdeaIsVoted ? (
+                      <>
+                        <CheckCircle2 size={18} />
+                        Remove Vote
+                      </>
+                    ) : hasVotedAnotherIdea ? (
+                      <>
+                        <Vote size={18} />
+                        Change Vote
+                      </>
+                    ) : (
+                      <>
+                        <Vote size={18} />
+                        Vote
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="thread-box">
@@ -980,8 +1154,9 @@ const conditionLabel = isAnonymousCondition
             <span>Final Convergence</span>
             <h2>Final Collaborative Idea</h2>
             <p>
-              After the discussion, the group should agree on one final idea here.
-              This will be exported for blind evaluation later.
+              As a group, agree on one final idea based on your discussion. Keep it
+              short, clear, and understandable for someone who did not join your session.
+              This final idea will be used for evaluation later.
             </p>
           </div>
 
