@@ -874,32 +874,6 @@ const conditionLabel = isAnonymousCondition
         </div>
       </section>
 
-      <section className="instructions-grid">
-        <div>
-          <strong>1. Submit</strong>
-          <p>
-            {isAnonymousCondition
-              ? "Write one idea anonymously. Do not include your name."
-              : "Write one idea with your name visible."}
-          </p>
-        </div>
-
-        <div>
-          <strong>2. Discuss</strong>
-          <p>Comment under each idea thread with critique, questions, or improvements.</p>
-        </div>
-
-        <div>
-          <strong>3. Debate</strong>
-          <p>Use the general chat to compare ideas and negotiate a stronger direction.</p>
-        </div>
-
-        <div>
-          <strong>4. Converge</strong>
-          <p>Write the final collaborative idea in the final decision panel.</p>
-        </div>
-      </section>
-
       <section className="stats-grid">
         <div className="stat-card">
           <Lightbulb />
