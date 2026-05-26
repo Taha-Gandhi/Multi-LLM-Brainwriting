@@ -131,10 +131,12 @@ function App() {
   const [participantName, setParticipantName] = useState("");
   const [studentId, setStudentId] = useState("");
   const [accessCode, setAccessCode] = useState("");
-  const [accessStatus, setAccessStatus] = useState("checking");
+  const [accessStatus, setAccessStatus] = useState("not_requested");
+  const [approvedParticipantId, setApprovedParticipantId] = useState("");
   const [accessError, setAccessError] = useState("");
   const sessionId = new URLSearchParams(window.location.search).get("session") || "default-session";
-  const participantId = getOrCreateParticipantId(sessionId);
+  const browserParticipantId = getOrCreateParticipantId(sessionId);
+  const participantId = approvedParticipantId || browserParticipantId;
   const ideasCollectionRef = collection(db, "sessions", sessionId, "ideas");
   const chatCollectionRef = collection(db, "sessions", sessionId, "generalChat");
   const finalIdeaRef = doc(db, "sessions", sessionId, "sessionData", "finalIdea");
@@ -142,13 +144,9 @@ function App() {
   const condition =
     new URLSearchParams(window.location.search).get("condition") || "1a";
 
-  const participantRef = doc(
-    db,
-    "sessions",
-    sessionId,
-    "participants",
-    participantId
-  );
+    const participantRef = approvedParticipantId
+    ? doc(db, "sessions", sessionId, "participants", approvedParticipantId)
+    : null;
 
   const sessionAccessCodes = {
     pilot: "PILOT1A",
@@ -186,8 +184,25 @@ const conditionLabel = isAnonymousCondition
 
   const totalVotes = ideas.reduce((total, idea) => total + idea.votes, 0);
   useEffect(() => {
-    const unsubscribe = onSnapshot(participantRef, (snapshot) => {
+    const savedStudentId = localStorage.getItem(`approved_student_${sessionId}`);
+  
+    if (!savedStudentId) {
+      setAccessStatus("not_requested");
+      return;
+    }
+  
+    const savedParticipantRef = doc(
+      db,
+      "sessions",
+      sessionId,
+      "participants",
+      savedStudentId
+    );
+  
+    const unsubscribe = onSnapshot(savedParticipantRef, (snapshot) => {
       if (!snapshot.exists()) {
+        localStorage.removeItem(`approved_student_${sessionId}`);
+        setApprovedParticipantId("");
         setAccessStatus("not_requested");
         return;
       }
@@ -195,6 +210,7 @@ const conditionLabel = isAnonymousCondition
       const data = snapshot.data();
   
       if (data.approved === true) {
+        setApprovedParticipantId(savedStudentId);
         setAccessStatus("approved");
         setParticipantName(data.name || "");
         setStudentId(data.studentId || "");
@@ -208,7 +224,7 @@ const conditionLabel = isAnonymousCondition
     });
   
     return () => unsubscribe();
-  }, [participantId, sessionId]);
+  }, [sessionId]);
   
   useEffect(() => {
     const ideasQuery = query(
@@ -301,7 +317,7 @@ const conditionLabel = isAnonymousCondition
     event.preventDefault();
   
     const cleanedName = participantName.trim();
-    const cleanedStudentId = studentId.trim();
+    const cleanedStudentId = studentId.trim().toUpperCase();
     const cleanedCode = accessCode.trim().toUpperCase();
   
     if (!cleanedName || !cleanedStudentId || !cleanedCode) {
@@ -319,10 +335,53 @@ const conditionLabel = isAnonymousCondition
       return;
     }
   
+    const studentParticipantRef = doc(
+      db,
+      "sessions",
+      sessionId,
+      "participants",
+      cleanedStudentId
+    );
+  
+    const existingParticipant = await getDoc(studentParticipantRef);
+  
+    if (existingParticipant.exists()) {
+      const data = existingParticipant.data();
+  
+      await setDoc(
+        studentParticipantRef,
+        {
+          name: cleanedName,
+          studentId: cleanedStudentId,
+          sessionId,
+          condition,
+          lastLoginAt: timeNow(),
+          lastLoginAtTimestamp: serverTimestamp(),
+        },
+        { merge: true }
+      );
+  
+      setApprovedParticipantId(cleanedStudentId);
+      localStorage.setItem(`approved_student_${sessionId}`, cleanedStudentId);
+  
+      setParticipantName(data.name || cleanedName);
+      setStudentId(data.studentId || cleanedStudentId);
+      setParticipantVote(data.votedIdeaId || "");
+  
+      if (data.approved === true) {
+        setAccessStatus("approved");
+      } else {
+        setAccessStatus("pending");
+      }
+  
+      setAccessError("");
+      return;
+    }
+  
     await setDoc(
-      participantRef,
+      studentParticipantRef,
       {
-        participantId,
+        participantId: cleanedStudentId,
         name: cleanedName,
         studentId: cleanedStudentId,
         sessionId,
@@ -330,9 +389,14 @@ const conditionLabel = isAnonymousCondition
         approved: false,
         requestedAt: timeNow(),
         requestedAtTimestamp: serverTimestamp(),
+        lastLoginAt: timeNow(),
+        lastLoginAtTimestamp: serverTimestamp(),
       },
       { merge: true }
     );
+  
+    setApprovedParticipantId(cleanedStudentId);
+    localStorage.setItem(`approved_student_${sessionId}`, cleanedStudentId);
   
     setAccessError("");
     setAccessStatus("pending");
@@ -460,6 +524,9 @@ const conditionLabel = isAnonymousCondition
   
     try {
       await runTransaction(db, async (transaction) => {
+        if (!participantRef) {
+          throw new Error("Participant record not ready.");
+        }
         const participantSnapshot = await transaction.get(participantRef);
         const selectedIdeaSnapshot = await transaction.get(selectedIdeaRef);
   
