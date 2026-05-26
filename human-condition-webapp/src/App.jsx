@@ -168,10 +168,6 @@ const conditionLabel = isAnonymousCondition
   ? "1a Anonymous Human Convergence"
   : "1b Open Human Convergence";
 
-  const hasSubmittedIdea = ideas.some(
-    (idea) => idea.authorParticipantId === participantId
-  );
-
   const sortedIdeas = useMemo(() => {
     return [...ideas].sort((a, b) => b.votes - a.votes);
   }, [ideas]);
@@ -373,11 +369,6 @@ const conditionLabel = isAnonymousCondition
   async function submitIdea(event) {
     event.preventDefault();
 
-    if (hasSubmittedIdea) {
-      alert("You have already submitted your one idea for this session.");
-      return;
-    }
-  
     if (!ideaTitle.trim() || !ideaBody.trim()) return;
   
     const newIdea = {
@@ -838,9 +829,12 @@ const conditionLabel = isAnonymousCondition
         <div className="rules-list">
           <div className="rule-item">
             <strong>1</strong>
-            <p>Submit exactly one idea before discussing or voting. You may delete your own
-              idea and submit a new one if needed. Please do not use AI; keep it creative
-              and original.</p>
+            <p>
+              First, submit one original idea using [Original] in the title.
+              After discussion, you may add collaborative ideas using
+              [Collaborative] in the title. Please do not use AI; keep the
+              ideas creative and original.
+            </p>
           </div>
 
           <div className="rule-item">
@@ -939,20 +933,14 @@ const conditionLabel = isAnonymousCondition
                 rows="5"
               />
 
-              <button className="primary-button" type="submit" disabled={hasSubmittedIdea}>
-                {hasSubmittedIdea
-                  ? "Idea Already Submitted"
-                  : isAnonymousCondition
-                    ? "Add idea anonymously"
-                    : "Add named idea"}
+              <button className="primary-button" type="submit">
+              {isAnonymousCondition ? "Add idea anonymously" : "Add named idea"}
               </button>
 
-              {hasSubmittedIdea && (
-                <p className="form-note">
-                  You have already submitted your one idea. You can now read, comment, vote,
-                  and help finalize the group idea.
-                </p>
-              )}
+              <p className="form-note">
+                Title format: use <strong>[Original]</strong> for your first individual idea
+                and <strong>[Collaborative]</strong> for ideas created together after discussion.
+              </p>
             </form>
           </div>
 
