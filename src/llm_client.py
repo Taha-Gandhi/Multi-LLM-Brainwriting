@@ -1,19 +1,26 @@
 import os
 import time
-from dotenv import load_dotenv
-from openai import OpenAI, RateLimitError, APIError
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv():
+        return None
+
+try:
+    from openai import OpenAI, RateLimitError, APIError
+except ImportError:
+    OpenAI = None
+
+    class RateLimitError(Exception):
+        pass
+
+    class APIError(Exception):
+        pass
 
 load_dotenv()
 
-api_key = os.getenv("OPENROUTER_API_KEY")
-
-if not api_key:
-    raise ValueError("OPENROUTER_API_KEY not found. Please add it to your .env file.")
-
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=api_key,
-)
+client = None
 
 FALLBACK_MODELS = [
     "openrouter/free",
@@ -23,6 +30,30 @@ FALLBACK_MODELS = [
     "inclusionai/ring-2.6-1t:free",
     "poolside/laguna-m1:free",
 ]
+
+
+def get_client():
+    global client
+
+    if client is None:
+        if OpenAI is None:
+            raise ImportError(
+                "The openai package is not installed. Run `pip install -r requirements.txt` first."
+            )
+
+        current_api_key = os.getenv("OPENROUTER_API_KEY")
+
+        if not current_api_key:
+            raise ValueError(
+                "OPENROUTER_API_KEY not found. Please add it to your .env file."
+            )
+
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=current_api_key,
+        )
+
+    return client
 
 
 def ask_model(agent_name, model_id, prompt, system_prompt=None, temperature=0.7, max_retries=1):
@@ -40,11 +71,12 @@ def ask_model(agent_name, model_id, prompt, system_prompt=None, temperature=0.7,
     models_to_try = [model_id] + [m for m in FALLBACK_MODELS if m != model_id]
 
     last_error = None
+    openrouter_client = get_client()
 
     for current_model in models_to_try:
         for attempt in range(max_retries):
             try:
-                response = client.chat.completions.create(
+                response = openrouter_client.chat.completions.create(
                     model=current_model,
                     messages=[
                         {

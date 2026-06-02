@@ -675,6 +675,77 @@ http://localhost:5173/?session=pilot&condition=1a
 
 ---
 
+## How to Run the Role-Based LLM Pipelines
+
+The LLM workflows now use three role groups. Each role has three agents with different personas:
+
+- Idea generation or revision agents create new ideas or improve existing ideas.
+- Idea evaluation agents analyze strengths and weaknesses, score ideas, and rank the best candidates.
+- Strategy revision agents write the next control prompt for the following generation round.
+
+Each iteration runs in this order:
+
+```text
+Stage 1: Idea generation or revision
+Stage 2: Idea evaluation, analysis, and ranking
+Stage 3: Idea generation strategy revision
+```
+
+After the configured iterations finish, a final evaluator synthesizes one final collaborative idea from the ranked candidates and evaluation history.
+
+Run the LLM-only condition:
+
+```bash
+python run_llm_condition.py
+```
+
+Run the human-idea + LLM condition:
+
+```bash
+python run_hybrid_condition.py
+```
+
+For the hybrid condition, put the human ideas in:
+
+```text
+human_ideas_input.txt
+```
+
+Useful hyperparameters:
+
+```bash
+python run_llm_condition.py --iterations 3 --max-ranked-ideas 6 --idea-temperature 0.9 --evaluation-temperature 0.25
+```
+
+Available setup options include:
+
+- `--challenge`
+- `--iterations`
+- `--max-ranked-ideas`
+- `--idea-word-limit`
+- `--evaluation-word-limit`
+- `--strategy-word-limit`
+- `--final-word-limit`
+- `--idea-temperature`
+- `--evaluation-temperature`
+- `--strategy-temperature`
+- `--final-temperature`
+- `--initial-strategy-prompt`
+- `--output-dir`
+- `--output-prefix`
+- `--final-agent-name`
+
+Default outputs:
+
+```text
+outputs/llm_condition_output.txt
+outputs/llm_debate_transcript.html
+outputs/hybrid_condition_output.txt
+outputs/hybrid_debate_transcript.html
+```
+
+---
+
 ## Example Study Links
 
 ### Anonymous Human Condition
